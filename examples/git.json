@@ -1,0 +1,11 @@
+{
+  "provider": "gitlab",
+  "owner": "software",
+  "repo": "platform",
+  "fromTag": "1.0.0",
+  "toTag": "1.0.1",
+  "stepTag": true,
+  "github_token": "",
+  "gitlab_token": "",
+  "gitlab_host": "https://gitlab.example.com"
+}
