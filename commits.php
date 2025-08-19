@@ -32,6 +32,7 @@ final class CommitRangeReporter
     private ?string $githubTok;
     private ?string $gitlabTok;
     private string $gitlabHost;
+    private string $language;
 
     private int $timeout = 20;
     private int $maxRedirects = 5;
@@ -45,7 +46,8 @@ final class CommitRangeReporter
         bool $stepTag = false,
         ?string $githubTok = null,
         ?string $gitlabTok = null,
-        string $gitlabHost = ''
+        string $gitlabHost = '',
+        string $language = ''
     ) {
         $this->provider  = strtolower($provider) === 'gitlab' ? 'gitlab' : 'github';
         $this->owner     = $owner;
@@ -56,6 +58,7 @@ final class CommitRangeReporter
         $this->githubTok = $githubTok;
         $this->gitlabTok = $gitlabTok;
         $this->gitlabHost = rtrim($gitlabHost, '/');
+        $this->language  = $language;
     }
 
     public static function fromArgs(array $argv): array
@@ -99,8 +102,9 @@ final class CommitRangeReporter
         $ghTok     = $cfg['github_token'] ?? null;
         $glTok     = $cfg['gitlab_token'] ?? null;
         $glHost    = $cfg['gitlab_host'] ?? '';
+        $language  = $cfg['language'] ?? '';
 
-        $reporter = new self($provider, $owner, $repo, $fromTag, $toTag, $stepTag, $ghTok, $glTok, $glHost);
+        $reporter = new self($provider, $owner, $repo, $fromTag, $toTag, $stepTag, $ghTok, $glTok, $glHost, $language);
 
         $outFile = $argc >= 3 ? (string)$argv[2] : 'commits.txt';
 
@@ -530,7 +534,12 @@ final class CommitRangeReporter
 
     private function printReleaseNotesPrompt(string $fromTag, string $toTag): void
     {
-        echo "Please generate Release Notes in the following style:" . PHP_EOL . PHP_EOL;
+        echo $this->language;
+        if ($this->language !== '') {
+            echo "Please generate Release Notes in $this->language and the following style:" . PHP_EOL . PHP_EOL;
+        } else {
+            echo "Please generate Release Notes in the following style:" . PHP_EOL . PHP_EOL;
+        }
         echo "- Always start with:" . PHP_EOL;
         echo "## Release {$toTag} – Changelog Summary" . PHP_EOL . PHP_EOL;
         echo "This release offers a short summary (1–3 sentences). Depending on the number of changes, a single sentence may suffice." . PHP_EOL;

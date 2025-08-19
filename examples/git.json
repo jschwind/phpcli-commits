@@ -4,5 +4,6 @@
   "repo": "asset-composer-bundle",
   "fromTag": "first",
   "toTag": "current",
+  //"language": "german",
   "stepTag": true
 }
