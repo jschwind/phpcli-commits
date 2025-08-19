@@ -232,6 +232,38 @@ function filterTagsByPrefix(array $tags, string $prefix): array {
     }));
 }
 
+/** ---------- NEW: Special keyword resolution ---------- */
+function resolveSpecialKeywords(string $fromTag, string $toTag, array $allTags): array {
+    $sorted = sortTagsAsc($allTags);
+
+    // Resolve fromTag keywords
+    switch (strtolower($fromTag)) {
+        case 'first':
+            $resolvedFrom = $sorted[0] ?? null;
+            break;
+        case '':
+            $resolvedFrom = $sorted[0] ?? null;
+            break;
+        default:
+            $resolvedFrom = resolveTag($fromTag, $allTags, 'min');
+    }
+
+    // Resolve toTag keywords
+    switch (strtolower($toTag)) {
+        case 'current':
+        case 'latest':
+            $resolvedTo = end($sorted) ?: null;
+            break;
+        case '':
+            $resolvedTo = end($sorted) ?: null;
+            break;
+        default:
+            $resolvedTo = resolveTag($toTag, $allTags, 'max');
+    }
+
+    return [$resolvedFrom, $resolvedTo];
+}
+
 function resolveTag(string $want, array $allTags, string $which): ?string {
     $candidates = $want === '' ? $allTags : filterTagsByPrefix($allTags, $want);
     if (!$candidates) return null;
@@ -371,30 +403,7 @@ function runCompareAndCapture(string $provider, string $owner, string $repo, str
 /** ---------- Flow ---------- */
 $provider = strtolower($provider) === "gitlab" ? "gitlab" : "github";
 
-if (!$stepTag) {
-    // Create output directory if needed
-    $dir = dirname($outFile);
-    if (!is_dir($dir)) {
-        if (!@mkdir($dir, 0777, true) && !is_dir($dir)) {
-            fwrite(STDERR, "❌ Could not create output directory: $dir\n");
-            exit(1);
-        }
-    }
-
-    // Generate content and write to file
-    $content = runCompareAndCapture($provider, $owner, $repo, $fromTag, $toTag, $githubTok, $gitlabTok, $gitlabHost);
-    $ok = @file_put_contents($outFile, $content);
-
-    if ($ok === false) {
-        fwrite(STDERR, "❌ Could not write to output file: $outFile\n");
-        exit(1);
-    }
-
-    fwrite(STDERR, "✅ Report written to: $outFile\n");
-    exit(0);
-}
-
-// STEP MODE
+// Fetch all tags first for keyword resolution
 $allTagNames = [];
 if ($provider === 'github') {
     $tagObjs = githubTags($owner, $repo, $githubTok);
@@ -411,8 +420,8 @@ if (!$allTagNames) {
     exit(1);
 }
 
-$resolvedFrom = resolveTag($fromTag, $allTagNames, 'min');
-$resolvedTo = resolveTag($toTag, $allTagNames, 'max');
+// Resolve special keywords
+[$resolvedFrom, $resolvedTo] = resolveSpecialKeywords($fromTag, $toTag, $allTagNames);
 
 if (!$resolvedFrom || !$resolvedTo) {
     fwrite(STDERR, "❌ Could not resolve fromTag/toTag. fromTag='$fromTag'→'".($resolvedFrom ?? 'null')."', toTag='$toTag'→'".($resolvedTo ?? 'null')."'\n");
@@ -421,6 +430,30 @@ if (!$resolvedFrom || !$resolvedTo) {
     exit(1);
 }
 
+if (!$stepTag) {
+    // Create output directory if needed
+    $dir = dirname($outFile);
+    if (!is_dir($dir)) {
+        if (!@mkdir($dir, 0777, true) && !is_dir($dir)) {
+            fwrite(STDERR, "❌ Could not create output directory: $dir\n");
+            exit(1);
+        }
+    }
+
+    // Generate content and write to file
+    $content = runCompareAndCapture($provider, $owner, $repo, $resolvedFrom, $resolvedTo, $githubTok, $gitlabTok, $gitlabHost);
+    $ok = @file_put_contents($outFile, $content);
+
+    if ($ok === false) {
+        fwrite(STDERR, "❌ Could not write to output file: $outFile\n");
+        exit(1);
+    }
+
+    fwrite(STDERR, "✅ Report written to: $outFile (from $resolvedFrom to $resolvedTo)\n");
+    exit(0);
+}
+
+// STEP MODE
 $range = tagsBetweenInclusive($allTagNames, $resolvedFrom, $resolvedTo);
 
 if (count($range) < 2) {
